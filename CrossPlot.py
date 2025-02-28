@@ -215,6 +215,10 @@ def hex_to_rgb(hex_color):
 #######################################################################################################################################################
 #######################################################################################################################################################
 
+
+# =============================================================================
+#region GraphWindow
+# =============================================================================
 class GraphWindow(QtWidgets.QWidget):  # Subclass QWidget for the second window
     def __init__(self):
         super().__init__()
@@ -259,7 +263,9 @@ class GraphWindow(QtWidgets.QWidget):  # Subclass QWidget for the second window
 
         self.graphWindow_label.setGeometry(label_x, label_y, label_width, label_height)
 
-
+# =============================================================================
+#region MainWindow
+# =============================================================================
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -437,7 +443,6 @@ class Ui_MainWindow(object):
         
         self.formation_color_label_list = [self.form1Color_label, self.form2Color_label, self.form3Color_label, self.form4Color_label, self.form5Color_label, self.form6Color_label, self.form7Color_label, self.form8Color_label, self.form9Color_label, self.form10Color_label, self.form11Color_label, self.form12Color_label, self.form13Color_label, self.form14Color_label, self.form15Color_label, self.form16Color_label]
         
-        
         self.form1Name_label = QtWidgets.QLabel(self.tab)
         self.form1Name_label.setGeometry(QtCore.QRect(1375, 80, 200, 25))
         self.form1Name_label.setObjectName('form1Name_label')
@@ -516,6 +521,11 @@ class Ui_MainWindow(object):
         self.totalDepth_texbox = QtWidgets.QTextEdit(self.tab, placeholderText="TD")
         self.totalDepth_texbox.setGeometry(QtCore.QRect(1075, 40, 50, 25))
         
+
+        # =============================================================================
+        #region Tab 1 End
+        # =============================================================================
+
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap(resource_path("picture--pencil.png")), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.tabWidget.addTab(self.tab, icon, "")
@@ -567,6 +577,10 @@ class Ui_MainWindow(object):
         self.formationPolygons_combox.setFont(font)
         self.formationPolygons_combox.setObjectName("formationPolygons_combox")
         
+        # =============================================================================
+        #region Tab 2 End
+        # =============================================================================
+
         icon1 = QtGui.QIcon()
         icon1.addPixmap(QtGui.QPixmap(resource_path("table-heatmap.png")), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.tabWidget.addTab(self.tab_2, icon1, "")
@@ -640,6 +654,10 @@ class Ui_MainWindow(object):
         icon2.addPixmap(QtGui.QPixmap(resource_path("palette-paint-brush.png")), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.tabWidget.addTab(self.tab_3, icon2, "")
         
+        # =============================================================================
+        #region Tab 3 End
+        # =============================================================================
+
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1511, 21))
@@ -807,7 +825,9 @@ class Ui_MainWindow(object):
         
         MainWindow.setCentralWidget(self.centralwidget)
         self.original_geometry = MainWindow.geometry()
-            # Store initial widget geometries for reference
+        # =============================================================================
+        #region Resize Widgets
+        # =============================================================================
         self.widget_geometries = {
             self.formation_id_labels: self.formation_id_labels.geometry(),
             self.form1Color_label: self.form1Color_label.geometry(),
@@ -923,7 +943,7 @@ class Ui_MainWindow(object):
 #######################################################################################################################################################################
 
 # =============================================================================
-# Bookmark: Main Page Widgets
+#region Main Page Widgets
 # =============================================================================
    
     def limit_TD(self):
@@ -941,10 +961,6 @@ class Ui_MainWindow(object):
         if np.any(shallower_than_forced_TD):
             self.formation_polygons[-1][1, shallower_than_forced_TD] = original_TD_copy[shallower_than_forced_TD]
        
-        
-        
-        
-
     def hide_formation_labels(self):
         """ 
         Hides the formation labels next to the plot in the main window if there is nothing plotted
@@ -1450,14 +1466,14 @@ class Ui_MainWindow(object):
             pass #If any error is encountered then just move on and ignore all this
             
 # =============================================================================
-# Bookmark: Sample Type
+#region Sample Type
 # =============================================================================
     
     def sample_changes(self):
         """ 
         This expands the sample type table to allow changes in sample type at all formation contacts or collapses the table if not
         """
-        
+
         #If the selection if yes then the current data is True
         if self.sampleType_combox.currentData():
             #Creates the table size needed for
@@ -1508,7 +1524,9 @@ class Ui_MainWindow(object):
                 item = self.sampleType_table.item(0, col)
                 self.core_or_cuttings[col] = item.text()
                 
-                
+    # =============================================================================
+    #region Contact Line Arrays
+    # =============================================================================
     def create_contact_line_arrays(self):
         """ 
         Creates 2 lists of line segments for solid and dashed contacts. Each line segment is created from the top row of formation polygons
@@ -1865,10 +1883,6 @@ class Ui_MainWindow(object):
                     
                     ########################################################################################################
                     
-                    
-                    
-                    
-                    
                 else: #This borehole and the next are the same sample type
                     if self.style_array[row, index] == 'n':
                         
@@ -1927,7 +1941,7 @@ class Ui_MainWindow(object):
         
         
 # =============================================================================
-# Bookmark: Data Updates                   
+#region Data Updates
 # =============================================================================
     """    
      These are all for checking if the user has made any changes to a piece of data. Each updates a unique status variable to be used in 
@@ -1962,7 +1976,7 @@ class Ui_MainWindow(object):
         self.max_TD_changed = True
             
 ######################################################################################################################################################
-            
+    #region Update Figure
     def update_figure(self):
         plt.close()
 
@@ -2004,9 +2018,6 @@ class Ui_MainWindow(object):
         if self.max_TD_changed:
             self.handle_limit_TD()
             updates_made = True
-            
-            
-            
         
         if updates_made:
             # Final updates
@@ -2066,7 +2077,7 @@ class Ui_MainWindow(object):
         self.max_TD_changed = False
 
 # =============================================================================
-# Bookmark: Data Import and Processing        
+#region Select File
 # =============================================================================
     
     def select_file (self):
@@ -2104,7 +2115,9 @@ class Ui_MainWindow(object):
         
         
         
-    
+    # =============================================================================
+    #region Create Plot
+    # =============================================================================
     def create_plot (self):
         """ 
         Creates the plot and populates it in the application window.
@@ -2282,7 +2295,9 @@ class Ui_MainWindow(object):
             #Append each initial polygon to a list where they can be accessed during the final polygon calculation
             self.initial_polygon_list.append(np.array([first_row, second_row]))
 
-    
+    # =============================================================================
+    #region Calculate Polygons
+    # =============================================================================
     def calculate_polygons(self):
         """
         ########################################################################################################################################################
@@ -2325,8 +2340,10 @@ class Ui_MainWindow(object):
                 midpoint_correction_index = 0 #Used to keep track of which number to use in the midpoint correction list for this row. Found in pinch_fade_correction_dict
                 tooth_index_correction = 0
             
-            
-           
+            # =============================================================================
+            #region Fade
+            # =============================================================================
+           #Calculates formations thatn pinch
             if np.any(self.style_array[row] == 'f') and row != self.style_array.shape[0]-1:
                 
 
@@ -2587,6 +2604,9 @@ class Ui_MainWindow(object):
                             tooth_index_correction += 2
                             
         ########################################################################################################################################################
+        # =============================================================================
+        #region Pinch
+        # =============================================================================
 
         #Calculates the polygons for formations that pinch
             if np.any(self.style_array[row] == 'p') and row != self.style_array.shape[0]-1:
@@ -2784,7 +2804,9 @@ class Ui_MainWindow(object):
                         midpoint_correction_index += 6
                     
         ########################################################################################################################################################
-
+        # =============================================================================
+        #region Normal
+        # =============================================================================
         #Calculates the polygons for formations that dont fade or pinch
             if ~np.any(self.style_array[row] == 'p') and ~np.any(self.style_array[row] == 'f') and row != self.style_array.shape[0]-1:
                 #Checks if the next formation down pinches or fades
@@ -2825,7 +2847,10 @@ class Ui_MainWindow(object):
                     total_stack = np.vstack((total_stack, self.locations))
                 
       ###############################################################################################################################################################          
-                
+            # =============================================================================
+            #region Connect
+            # =============================================================================
+            #Calculates polygons with connections
             if np.any(self.style_array[row] == 'c'):
                 connect_index = np.where(self.style_array[row] == 'c')[0] #Creates an array of all the indexes where the style is c
                
@@ -2926,7 +2951,7 @@ class Ui_MainWindow(object):
 ######################################################################################################################################################################
 
 # =============================================================================
-# Bookmark: Exports
+#region Exports
 # =============================================================================
 
     def export_as_excel(self):
@@ -2953,10 +2978,10 @@ class Ui_MainWindow(object):
         df_export.to_excel(save_path, index=False)
             
 ########################################################################################################################################################################
-    
-    
 
-
+    # =============================================================================
+    #region Illustrator DXF
+    # =============================================================================
     def save_illustrator_dxf(self):
         """ 
         Uses ezdxf to create an illustrator compatible file with layers. Hatches and contact lines included with this file
@@ -3187,8 +3212,11 @@ class Ui_MainWindow(object):
                 msp.add_text(str(distance_feet), dxfattribs={"insert":(distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-430)})
 
         doc.saveas(save_path)
-            
-            
+
+
+    # =============================================================================
+    #region Autocad DXF
+    # =============================================================================
     def save_autocad_dxf(self):
         save_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, 'Save File', '')
         save_path += '.dxf'
