@@ -960,6 +960,8 @@ class Ui_MainWindow(object):
             self.formation_polygons[-1][1, deeper_than_forced_TD] = self.max_TD
         if np.any(shallower_than_forced_TD):
             self.formation_polygons[-1][1, shallower_than_forced_TD] = original_TD_copy[shallower_than_forced_TD]
+
+        
        
     def hide_formation_labels(self):
         """ 
@@ -1169,7 +1171,7 @@ class Ui_MainWindow(object):
     def create_pinch_fade_correction_dict(self):
         """ 
         Creates dictionaries with pinch/fade lists, also creates well dictionaries for both and a tooth number dictionary.
-        This dictionaries are locations for the user to edit these features in the front end and create some sort of change in the plot
+        These dictionaries are locations necessary for the user to edit these features in the front end and create some sort of change in the plot
         """
         
         # Defining all the empty dictionaries
@@ -2165,10 +2167,11 @@ class Ui_MainWindow(object):
             
         ax.fill_between(self.distance, self.elev, self.tallest_borehole+50, color='w', zorder = 13)
         
-        
         #Plots the borehole lines to indicate location and depth, also adds W-#
         for n in range(len(self.w_num)):
-            ax.vlines(self.locations[n], color='k', ymin=self.formation_polygons[-1][1, n], ymax=self.well_elev[n])
+            bottom_index = np.where(self.formation_polygons[-1][-1] == self.locations[n])[0][0]
+            
+            ax.vlines(self.locations[n], color='k', ymin=self.formation_polygons[-1][1, bottom_index], ymax=self.well_elev[n])
             ax.annotate("W-" + str(self.w_num[n]), (self.locations[n] - self.locations[-1]*0.01 , self.tallest_borehole + 80)) #Note that this uses 1% of the total length to offset labels over well lines
         
        
@@ -2191,7 +2194,9 @@ class Ui_MainWindow(object):
             self.main_xsecplot.setPixmap(self.pixmap)
             self.graph_window.graphWindow_label.setPixmap(self.pixmap)
                 
-        
+    # =============================================================================
+    #region Intial Info
+    # =============================================================================
     def create_initial_info (self):
         """
         Pulls info from the selected excel sheet and generates arrays with formation tops, style, elevation, distance, w numbers and sample type.
@@ -3203,14 +3208,14 @@ class Ui_MainWindow(object):
                 msp.add_text(str(depth), dxfattribs={'insert':(shortened_locations[0]-20, depth*3.281), 'layer':'Scale_Bar'})
         
         #Adds horizontal scale bar
-        shortened_mile = 5280 / self.vertical_exaggeration_inputte
+        shortened_mile = 5280 / self.vertical_exaggeration_inputted
         msp.add_line((0, self.deepest_borehole - 500), (shortened_mile, self.deepest_borehole-500), dxfattribs={'layer': 'Scale_Bar'})
         
         for distance_feet in range(5281):
             if distance_feet % 1000 == 0:
                 msp.add_line((distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-500), (distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-450), dxfattribs={'layer': "Scale_Bar"})
                 msp.add_text(str(distance_feet), dxfattribs={"insert":(distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-430)})
-
+        
         doc.saveas(save_path)
 
 
@@ -3377,7 +3382,7 @@ class Ui_MainWindow(object):
                 msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-20, depth*3.281), 'layer':'Scale_Bar'})
         
         #Adds horizontal scale bar
-        shortened_mile = 5280 / self.vertical_exaggeration_inputte
+        shortened_mile = 5280 / self.vertical_exaggeration_inputted
         msp.add_line((0, self.deepest_borehole - 500), (shortened_mile, self.deepest_borehole-500), dxfattribs={'layer': 'Scale_Bar'})
         
         for distance_feet in range(5281):
@@ -3390,7 +3395,9 @@ class Ui_MainWindow(object):
     
     
     
-    
+    # =============================================================================
+    #region PDF
+    # =============================================================================
     def save_pdf (self):
         save_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, 'Save File', '')
         save_path += '.pdf'
@@ -3426,7 +3433,9 @@ class Ui_MainWindow(object):
         
         fig.savefig(save_path, format='pdf', dpi=300)
         
-        
+    # =============================================================================
+    #region PNG
+    # =============================================================================
     def save_png (self):
         save_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, 'Save File', '')
         save_path += '.png'
@@ -3498,7 +3507,9 @@ class Ui_MainWindow(object):
         
         fig.savefig(save_path, format='tiff', dpi=300)    
         
-        
+    # =============================================================================
+    #region JPEG
+    # =============================================================================
     def save_jpeg (self):
         save_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, 'Save File', '')
         save_path += '.jpeg'
@@ -3534,7 +3545,9 @@ class Ui_MainWindow(object):
         
         fig.savefig(save_path, format='jpeg', dpi=300)
         
-        
+    # =============================================================================
+    #region EPS
+    # =============================================================================
     def save_eps (self):
         save_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, 'Save File', '')
         save_path += '.eps'
@@ -3571,7 +3584,9 @@ class Ui_MainWindow(object):
         fig.savefig(save_path, format='eps', dpi=300)
         
 ##################################################################################################################################################
-
+# =============================================================================
+#region Run Program
+# =============================================================================
 #Creates a subclass that allows people to resize the window and the widgets will change accordignly
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
