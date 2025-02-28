@@ -772,7 +772,6 @@ class Ui_MainWindow(object):
         self.sampleType_table.itemChanged.connect(self.sample_type_updated_status)
         self.colors_table.itemChanged.connect(self.colors_status)
         self.verticalExaggeration_textbox.textChanged.connect(self.vertical_exaggeration_status)
-        self.totalDepth_texbox.textChanged.connect(self.limit_TD)
         self.totalDepth_texbox.textChanged.connect(self.max_TD_status)
         
         self.sampleType_combox.activated.connect(self.sample_changes)
@@ -932,8 +931,16 @@ class Ui_MainWindow(object):
         Limits the TD of wells to the number entered
         """
         self.max_TD = -int(self.totalDepth_texbox.toPlainText())
+        original_TD_copy = self.original_TD.copy()
         
-        self.mask = self.formation_polygons[-1][1] < self.max_TD
+        deeper_than_forced_TD = original_TD_copy < self.max_TD
+        shallower_than_forced_TD = original_TD_copy > self.max_TD
+        
+        if np.any(deeper_than_forced_TD):
+            self.formation_polygons[-1][1, deeper_than_forced_TD] = self.max_TD
+        if np.any(shallower_than_forced_TD):
+            self.formation_polygons[-1][1, shallower_than_forced_TD] = original_TD_copy[shallower_than_forced_TD]
+       
         
         
         
@@ -1995,8 +2002,11 @@ class Ui_MainWindow(object):
             return
         
         if self.max_TD_changed:
-            self.formation_polygons[-1][1, self.mask] = self.max_TD
+            self.handle_limit_TD()
             updates_made = True
+            
+            
+            
         
         if updates_made:
             # Final updates
@@ -2051,6 +2061,10 @@ class Ui_MainWindow(object):
         self.update_colors_list()
         self.colors_updated = False
 
+    def handle_limit_TD(self):
+        self.limit_TD()
+        self.max_TD_changed = False
+
 # =============================================================================
 # Bookmark: Data Import and Processing        
 # =============================================================================
@@ -2059,8 +2073,7 @@ class Ui_MainWindow(object):
         """
         Opens a file selection dialog and pulls in an excel sheet. Then goes through the full suite of functions to create the plot
         """
-        
-        
+
         fname = QtWidgets.QFileDialog.getOpenFileName(None, 'Open File', '') #Opens a file selection dialog in a random filepath
         self.filepath = fname[0] #Once a file is selected, this grabs the actual filepath as a string
         
@@ -2071,6 +2084,7 @@ class Ui_MainWindow(object):
         self.formation_polygons_combo_box()
         self.create_initial_polygon_list()
         self.calculate_polygons()
+        self.original_TD = self.formation_polygons[-1][1].copy()
         self.create_plot()
         self.create_formations_table()
         self.create_style_table()
@@ -2086,7 +2100,8 @@ class Ui_MainWindow(object):
         self.pinchFadeslider_changed = False
         self.toothNumber_changed = False
         self.figSize_changed = False
-            
+        
+        
         
         
     
@@ -2237,7 +2252,7 @@ class Ui_MainWindow(object):
                 self.plotting_colors.append(self.colors_list[runs])
                 runs += 1
                 
-        self.original_TD = self.formations_array[-1]
+        
             
     def create_initial_polygon_list(self):
         """ 
@@ -3139,17 +3154,19 @@ class Ui_MainWindow(object):
             rounded_top += 50 
         if rounded_bottom > self.deepest_borehole:
             rounded_bottom -= 50
-            
+        
+        #Adds vertical scale bar
         msp.add_line((shortened_locations[0]-50, rounded_bottom), (shortened_locations[0]-50, rounded_top), dxfattribs={'layer':'Scale_Bar'})
         
+        #Adds the depth lines on the scale bar in feet
         for depth in range(rounded_bottom, rounded_top+1, 10):
-            
             if depth % 50 == 0:
                 msp.add_line((shortened_locations[0]-70, depth), (shortened_locations[0]-50, depth), dxfattribs={'layer':'Scale_Bar'})
                 msp.add_text(str(depth), dxfattribs={'insert':(shortened_locations[0]-90, depth), 'layer':'Scale_Bar'})
             else:
                 msp.add_line((shortened_locations[0]-60, depth), (shortened_locations[0]-50, depth), dxfattribs={'layer':'Scale_Bar'})
-             
+
+        #Adds the depth lines on the scale bar in meters
         for depth in range(meters_top):
             if depth % 20 == 0:
                 msp.add_line((shortened_locations[0]-30, depth*3.281), (shortened_locations[0]-50, depth*3.281), dxfattribs={'layer':'Scale_Bar'})
@@ -3160,8 +3177,15 @@ class Ui_MainWindow(object):
                 msp.add_line((shortened_locations[0]-30, depth*3.281), (shortened_locations[0]-50, depth*3.281), dxfattribs={'layer':'Scale_Bar'})
                 msp.add_text(str(depth), dxfattribs={'insert':(shortened_locations[0]-20, depth*3.281), 'layer':'Scale_Bar'})
         
+        #Adds horizontal scale bar
+        shortened_mile = 5280 / self.vertical_exaggeration_inputte
+        msp.add_line((0, self.deepest_borehole - 500), (shortened_mile, self.deepest_borehole-500), dxfattribs={'layer': 'Scale_Bar'})
         
-        
+        for distance_feet in range(5281):
+            if distance_feet % 1000 == 0:
+                msp.add_line((distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-500), (distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-450), dxfattribs={'layer': "Scale_Bar"})
+                msp.add_text(str(distance_feet), dxfattribs={"insert":(distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-430)})
+
         doc.saveas(save_path)
             
             
@@ -3324,6 +3348,14 @@ class Ui_MainWindow(object):
                 msp.add_line((self.locations[0]-30, depth*3.281), (self.locations[0]-50, depth*3.281), dxfattribs={'layer':'Scale_Bar'})
                 msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-20, depth*3.281), 'layer':'Scale_Bar'})
         
+        #Adds horizontal scale bar
+        shortened_mile = 5280 / self.vertical_exaggeration_inputte
+        msp.add_line((0, self.deepest_borehole - 500), (shortened_mile, self.deepest_borehole-500), dxfattribs={'layer': 'Scale_Bar'})
+        
+        for distance_feet in range(5281):
+            if distance_feet % 1000 == 0:
+                msp.add_line((distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-500), (distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-450), dxfattribs={'layer': "Scale_Bar"})
+                msp.add_text(str(distance_feet), dxfattribs={"insert":(distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-430)})
         
         
         doc.saveas(save_path)
