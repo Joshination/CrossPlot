@@ -3177,13 +3177,15 @@ class Ui_MainWindow(object):
         rounded_top = round(self.tallest_borehole/50) * 50
         rounded_bottom = round(self.deepest_borehole/50) * 50
         
-        meters_top = int(rounded_top / 3.281)
-        meters_bottom = int(rounded_bottom / 3.281)
-        
         if rounded_top < self.tallest_borehole:
             rounded_top += 50 
         if rounded_bottom > self.deepest_borehole:
             rounded_bottom -= 50
+        
+        meters_top = int(rounded_top / 3.281)
+        meters_bottom = int(rounded_bottom / 3.281)
+        
+        
         
         #Adds vertical scale bar
         msp.add_line((shortened_locations[0]-50, rounded_bottom), (shortened_locations[0]-50, rounded_top), dxfattribs={'layer':'Scale_Bar'})
@@ -3197,7 +3199,7 @@ class Ui_MainWindow(object):
                 msp.add_line((shortened_locations[0]-60, depth), (shortened_locations[0]-50, depth), dxfattribs={'layer':'Scale_Bar'})
 
         #Adds the depth lines on the scale bar in meters
-        for depth in range(meters_top):
+        for depth in range(meters_top+1):
             if depth % 20 == 0:
                 msp.add_line((shortened_locations[0]-30, depth*3.281), (shortened_locations[0]-50, depth*3.281), dxfattribs={'layer':'Scale_Bar'})
                 msp.add_text(str(depth), dxfattribs={'insert':(shortened_locations[0]-20, depth*3.281), 'layer':'Scale_Bar'})
