@@ -1,7 +1,7 @@
 """
 Created on Tue Nov 19 11:51 2024
 Updated on Mon Feb 17 12:43 2025
-Version 0.5.3
+Version 0.5.4
 
 @author: Thomas_JA
 """
@@ -756,6 +756,7 @@ class Ui_MainWindow(object):
         self.pinchFadeslider_changed = False
         self.toothNumber_changed = False
         self.figSize_changed = False
+        self.max_TD_changed = False
         
         self.table_font = QtGui.QFont('MS Shell Dlg 2', 12)
         
@@ -769,7 +770,7 @@ class Ui_MainWindow(object):
         
         self.default_figsize = [24, 12]
         self.figsize = [24, 12]
-        
+        self.max_TD = -1000000000000
         
         self.colors_list = ['#c0392b', '#e74c3c', '#9b59b6', '#8e44ad', '#2980b9', '#3498db', '#1abc9c', '#16a085', '#27ae60', '#2ecc71', '#f1c40f', '#f39c12', '#e67e22', '#d35400', '#34495e', '#2c3e50']
         self.formation_colors = {"qh": "#E0A74D", "qbd": "#FFDB96", "qu": "#EBEB98", "tqu": "#DCC27D", "tc": "#CCCCCC", "th": "#75E5AB", "thp": "#92C272", "that": "#DEA0CB", "ts": "#B7B1F1", "to": "#6CD1E8", "tap": "#3460C1", "tha": "#FAC0CC" }
@@ -790,7 +791,6 @@ class Ui_MainWindow(object):
         self.sampleType_table.itemChanged.connect(self.sample_type_updated_status)
         self.colors_table.itemChanged.connect(self.colors_status)
         self.verticalExaggeration_textbox.textChanged.connect(self.vertical_exaggeration_status)
-        self.totalDepth_texbox.textChanged.connect(self.max_TD_status)
         
         self.sampleType_combox.activated.connect(self.sample_changes)
         
@@ -946,23 +946,41 @@ class Ui_MainWindow(object):
 #region Main Page Widgets
 # =============================================================================
    
+    def update_current_TD(self):
+        
+        if np.any(self.style_array[-1] == 'c'):
+            connection_TD_indices = np.where(self.style_array[-1] == 'c')[0]
+            for connection_TD_index in connection_TD_indices:
+                formation_polygon_connection_index = np.where(self.formation_polygons[-1][-1] == self.locations[connection_TD_index])[0][0]
+                self.current_TD[connection_TD_index] = self.formation_polygons[-1][1, formation_polygon_connection_index]
+
     def limit_TD(self):
         """
         Limits the TD of wells to the number entered
         """
         self.max_TD = -int(self.totalDepth_texbox.toPlainText())
-        original_TD_copy = self.original_TD.copy()
         
-        deeper_than_forced_TD = original_TD_copy < self.max_TD
-        shallower_than_forced_TD = original_TD_copy > self.max_TD
         
-        if np.any(deeper_than_forced_TD):
-            self.formation_polygons[-1][1, deeper_than_forced_TD] = self.max_TD
-        if np.any(shallower_than_forced_TD):
-            self.formation_polygons[-1][1, shallower_than_forced_TD] = original_TD_copy[shallower_than_forced_TD]
+        deeper_than_forced_TD = self.original_TD < self.max_TD
+        
+        for borehole_index in range(self.original_TD.shape[0]):
+            TD = np.nan
+            formation = 0
+            while np.isnan(TD):
+                formation -= 1
+                TD_index = np.where(self.formation_polygons[formation][-1] == self.locations[borehole_index])[0][0]
+                TD = self.formation_polygons[formation][1, TD_index]
+                
+            if TD < self.max_TD:
+                #Set to the max_TD
+                self.formation_polygons[formation][1, TD_index] = self.max_TD
+                
+            else:
+                #Set to the original_TD
+                self.formation_polygons[formation][1, TD_index] = self.current_TD[borehole_index].copy()
+                
+            
 
-        
-       
     def hide_formation_labels(self):
         """ 
         Hides the formation labels next to the plot in the main window if there is nothing plotted
@@ -1393,6 +1411,8 @@ class Ui_MainWindow(object):
             for col in range(self.formations_array.shape[1]):
                 item = self.formations_table.item(row, col) #Pulls the item in the formation table
                 self.formations_array[row, col] = float(item.text()) #Converts it to a usable value and assigns it to the correct location
+        self.original_TD = self.formations_array[-1].copy()
+        self.current_TD = self.formations_array[-1].copy()
             
                 
     def create_style_table(self):
@@ -1975,13 +1995,17 @@ class Ui_MainWindow(object):
         self.figSize_changed = True
         
     def max_TD_status(self):
-        self.max_TD_changed = True
+        if self.totalDepth_texbox.toPlainText().strip():
+            self.max_TD_changed = True
             
 ######################################################################################################################################################
+    # =============================================================================
     #region Update Figure
+    # =============================================================================
     def update_figure(self):
         plt.close()
 
+        self.max_TD_status()
         # Early exits for simple changes that don't require lots of calculations
         if self.toothNumber_changed:
             self.handle_tooth_number_change()
@@ -2060,6 +2084,7 @@ class Ui_MainWindow(object):
         self.create_pinch_fade_correction_dict()
         self.formation_polygons_combo_box()
         self.calculate_polygons()
+        self.update_current_TD()
         self.style_updated = False
 
     def handle_polygon_update(self):
@@ -2093,11 +2118,11 @@ class Ui_MainWindow(object):
         self.plotting_colors = []
         
         self.create_initial_info()
+        self.current_TD = self.formations_array[-1].copy()
         self.create_pinch_fade_correction_dict()
         self.formation_polygons_combo_box()
         self.create_initial_polygon_list()
         self.calculate_polygons()
-        self.original_TD = self.formation_polygons[-1][1].copy()
         self.create_plot()
         self.create_formations_table()
         self.create_style_table()
@@ -2113,9 +2138,6 @@ class Ui_MainWindow(object):
         self.pinchFadeslider_changed = False
         self.toothNumber_changed = False
         self.figSize_changed = False
-        
-        
-        
         
     # =============================================================================
     #region Create Plot
@@ -2169,9 +2191,11 @@ class Ui_MainWindow(object):
         
         #Plots the borehole lines to indicate location and depth, also adds W-#
         for n in range(len(self.w_num)):
-            bottom_index = np.where(self.formation_polygons[-1][-1] == self.locations[n])[0][0]
-            
-            ax.vlines(self.locations[n], color='k', ymin=self.formation_polygons[-1][1, bottom_index], ymax=self.well_elev[n])
+
+            if self.original_TD[n] > self.max_TD:
+                ax.vlines(self.locations[n], color='k', ymin=self.original_TD[n], ymax=self.well_elev[n])
+            else:
+                ax.vlines(self.locations[n], color='k', ymin=self.max_TD, ymax=self.well_elev[n])
             ax.annotate("W-" + str(self.w_num[n]), (self.locations[n] - self.locations[-1]*0.01 , self.tallest_borehole + 80)) #Note that this uses 1% of the total length to offset labels over well lines
         
        
@@ -2190,7 +2214,7 @@ class Ui_MainWindow(object):
         self.pixmap = QtGui.QPixmap()
         success = self.pixmap.loadFromData(plot_image) #ChatGPT wanted there to be a success variable for some reason, it works so im not messing with it
 
-        if success: #Again i not sure why ChatGPT decided this if statement need to be here but it works so im not messing with it
+        if success: #Again I'm not sure why ChatGPT decided this if statement need to be here but it works so im not messing with it
             self.main_xsecplot.setPixmap(self.pixmap)
             self.graph_window.graphWindow_label.setPixmap(self.pixmap)
                 
@@ -2269,7 +2293,9 @@ class Ui_MainWindow(object):
             else:
                 self.plotting_colors.append(self.colors_list[runs])
                 runs += 1
-                
+
+        self.original_TD = self.formations_array[-1].copy()
+        self.current_TD = self.formations_array[-1].copy()
         
             
     def create_initial_polygon_list(self):
@@ -3176,7 +3202,7 @@ class Ui_MainWindow(object):
         
         rounded_top = round(self.tallest_borehole/50) * 50
         rounded_bottom = round(self.deepest_borehole/50) * 50
-        
+
         if rounded_top < self.tallest_borehole:
             rounded_top += 50 
         if rounded_bottom > self.deepest_borehole:
