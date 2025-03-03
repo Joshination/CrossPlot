@@ -3247,10 +3247,11 @@ class Ui_MainWindow(object):
         shortened_mile = 5280 / self.vertical_exaggeration_inputted
         msp.add_line((0, self.deepest_borehole - 500), (shortened_mile, self.deepest_borehole-500), dxfattribs={'layer': 'Scale_Bar'})
         
-        for distance_feet in range(5281):
-            if distance_feet % 1000 == 0:
-                msp.add_line((distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-500), (distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-450), dxfattribs={'layer': "Scale_Bar"})
-                msp.add_text(str(distance_feet), dxfattribs={"insert":(distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-430)})
+        mile_markers = [0, 1320, 2640, 3960, 5280]
+
+        for marker in mile_markers:
+            msp.add_line((marker/self.vertical_exaggeration_inputted, self.deepest_borehole-500), (marker/self.vertical_exaggeration_inputted, self.deepest_borehole-450), dxfattribs={'layer': "Scale_Bar"})
+            msp.add_text(str(marker), dxfattribs={"insert":(marker/self.vertical_exaggeration_inputted, self.deepest_borehole-430)})
         
         doc.saveas(save_path)
 
@@ -3262,6 +3263,7 @@ class Ui_MainWindow(object):
         save_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, 'Save File', '')
         save_path += '.dxf'
         
+        """
         formation_chunk_dict = {}
         
         for row, style in enumerate(self.style_array[:-1]):
@@ -3360,13 +3362,16 @@ class Ui_MainWindow(object):
                     if formation_polygon_chunk.shape[1] != 0:
                         formation_chunk_dict[row].append(formation_polygon_chunk)
                         
-            
+          """
+        
+        shortened_locations = np.array(self.locations) / self.vertical_exaggeration_inputted
+        shortened_distance  = np.array(self.distance) / self.vertical_exaggeration_inputted
         #print(formation_chunk_dict)
         doc = ezdxf.new("R2000")
         msp = doc.modelspace()
         
         doc.layers.add(name='Formation_Polygons')
-        doc.layers.add(name='Solid_Contact_Lines')
+        doc.layers.add(name='Surficial_Geology')
         doc.layers.add(name='Boreholes')
         doc.layers.add(name='Dashed_Contact_Lines')
         doc.layers.add(name='W-Numbers')
@@ -3375,17 +3380,18 @@ class Ui_MainWindow(object):
         if "DASHED" not in doc.linetypes:
             doc.linetypes.new("DASHED", dxfattribs={"description": "Dashed __ __ __", "pattern": [100, 50, -50]})
             
-        
+        #Adds the borehole lines
         for n in range(len(self.w_num)):
-            msp.add_line((self.locations[n], self.formations_array[-1, n]), (self.locations[n], self.well_elev[n]), dxfattribs={'layer': 'Boreholes'} )
-            msp.add_text(self.w_num_headers[n], dxfattribs={'insert':(self.locations[n], self.tallest_borehole+80), 'layer':'W-Numbers'})
+            msp.add_line((shortened_locations[n], self.formations_array[-1, n]), (shortened_locations[n], self.well_elev[n]), dxfattribs={'layer': 'Boreholes'} )
+            msp.add_text(self.w_num_headers[n], dxfattribs={'insert':(shortened_locations[n], self.tallest_borehole+80), 'layer':'W-Numbers'})
         
+        #Adds the Surface Elevation line
         line_points_list = []
         for i in range(len(self.elev)):
-            line_points_list.append((self.distance[i], self.elev[i]))
-        msp.add_lwpolyline(line_points_list, dxfattribs={'layer':"Solid_Contact_Lines"})
+            line_points_list.append((self.distance[i] / self.vertical_exaggeration_inputted, self.elev[i]))
+        msp.add_lwpolyline(line_points_list, dxfattribs={'layer':"Surficial_Geology"})
     
-        
+        #Creates a rounded top and bottom for the scale bar
         rounded_top = round(self.tallest_borehole/50) * 50
         rounded_bottom = round(self.deepest_borehole/50) * 50
         
@@ -3396,17 +3402,19 @@ class Ui_MainWindow(object):
             rounded_top += 50 
         if rounded_bottom > self.deepest_borehole:
             rounded_bottom -= 50
-            
+        
+        #Adds the vertical scale bar
         msp.add_line((self.locations[0]-50, rounded_bottom), (self.locations[0]-50, rounded_top), dxfattribs={'layer':'Scale_Bar'})
         
+        #Add the depth lines on the scale bar in feet
         for depth in range(rounded_bottom, rounded_top+1, 10):
-            
             if depth % 50 == 0:
                 msp.add_line((self.locations[0]-70, depth), (self.locations[0]-50, depth), dxfattribs={'layer':'Scale_Bar'})
                 msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-90, depth), 'layer':'Scale_Bar'})
             else:
                 msp.add_line((self.locations[0]-60, depth), (self.locations[0]-50, depth), dxfattribs={'layer':'Scale_Bar'})
-             
+        
+        #Adds the depth lines on the scale bar in meters
         for depth in range(meters_top):
             if depth % 20 == 0:
                 msp.add_line((self.locations[0]-30, depth*3.281), (self.locations[0]-50, depth*3.281), dxfattribs={'layer':'Scale_Bar'})
@@ -3419,12 +3427,13 @@ class Ui_MainWindow(object):
         
         #Adds horizontal scale bar
         shortened_mile = 5280 / self.vertical_exaggeration_inputted
-        msp.add_line((0, self.deepest_borehole - 500), (shortened_mile, self.deepest_borehole-500), dxfattribs={'layer': 'Scale_Bar'})
-        
-        for distance_feet in range(5281):
-            if distance_feet % 1000 == 0:
-                msp.add_line((distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-500), (distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-450), dxfattribs={'layer': "Scale_Bar"})
-                msp.add_text(str(distance_feet), dxfattribs={"insert":(distance_feet/self.vertical_exaggeration_inputted, self.deepest_borehole-430)})
+        msp.add_line((0, self.deepest_borehole - 110), (shortened_mile, self.deepest_borehole-110), dxfattribs={'layer': 'Scale_Bar'})
+
+        mile_markers = [0, 1320, 2640, 3960, 5280]
+
+        for marker in mile_markers:
+            msp.add_line((marker/self.vertical_exaggeration_inputted, self.deepest_borehole-120), (marker/self.vertical_exaggeration_inputted, self.deepest_borehole-110), dxfattribs={'layer': "Scale_Bar"})
+            msp.add_text(str(marker), dxfattribs={"insert":(marker/self.vertical_exaggeration_inputted, self.deepest_borehole-100)})
         
         
         doc.saveas(save_path)
