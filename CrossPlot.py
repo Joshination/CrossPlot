@@ -791,6 +791,7 @@ class Ui_MainWindow(object):
         self.sampleType_table.itemChanged.connect(self.sample_type_updated_status)
         self.colors_table.itemChanged.connect(self.colors_status)
         self.verticalExaggeration_textbox.textChanged.connect(self.vertical_exaggeration_status)
+        self.totalDepth_texbox.textChanged.connect(self.max_TD_textbox_status)
         
         self.sampleType_combox.activated.connect(self.sample_changes)
         
@@ -958,7 +959,10 @@ class Ui_MainWindow(object):
         """
         Limits the TD of wells to the number entered
         """
-        self.max_TD = -int(self.totalDepth_texbox.toPlainText())
+        try:
+            self.max_TD = -int(self.totalDepth_texbox.toPlainText())
+        except:
+            self.max_TD = -1000000000000
         
         
         deeper_than_forced_TD = self.original_TD < self.max_TD
@@ -1997,6 +2001,9 @@ class Ui_MainWindow(object):
     def max_TD_status(self):
         if self.totalDepth_texbox.toPlainText().strip():
             self.max_TD_changed = True
+    
+    def max_TD_textbox_status(self):
+        self.max_TD_changed = True
             
 ######################################################################################################################################################
     # =============================================================================
@@ -2039,6 +2046,7 @@ class Ui_MainWindow(object):
             
         if self.figSize_changed and updates_made == False:
             self.create_plot()
+            self.figSize_changed = False
             return
         
         if self.max_TD_changed:
