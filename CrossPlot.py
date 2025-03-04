@@ -2205,8 +2205,6 @@ class Ui_MainWindow(object):
             else:
                 ax.vlines(self.locations[n], color='k', ymin=self.max_TD, ymax=self.well_elev[n])
             ax.annotate("W-" + str(self.w_num[n]), (self.locations[n] - self.locations[-1]*0.01 , self.tallest_borehole + 80)) #Note that this uses 1% of the total length to offset labels over well lines
-        
-       
             
         #Set x and y axis labels
         ax.set_xlabel("Distance (ft)")
@@ -3364,6 +3362,11 @@ class Ui_MainWindow(object):
                         
           """
         
+
+
+
+
+
         shortened_locations = np.array(self.locations) / self.vertical_exaggeration_inputted
         shortened_distance  = np.array(self.distance) / self.vertical_exaggeration_inputted
         #print(formation_chunk_dict)
@@ -3375,8 +3378,11 @@ class Ui_MainWindow(object):
         doc.layers.add(name='Boreholes')
         doc.layers.add(name='Dashed_Contact_Lines')
         doc.layers.add(name='W-Numbers')
-        doc.layers.add(name='Scale_Bar')
-        
+        doc.layers.add(name='Horizontal_Scale_Bar')
+        doc.layers.add(name='Horizontal_Scale_Bar_Text')
+        doc.layers.add(name='Vertical_Scale_Bar')
+        doc.layers.add(name='Vertical_Scale_Bar_Text')
+
         if "DASHED" not in doc.linetypes:
             doc.linetypes.new("DASHED", dxfattribs={"description": "Dashed __ __ __", "pattern": [100, 50, -50]})
             
@@ -3404,37 +3410,41 @@ class Ui_MainWindow(object):
             rounded_bottom -= 50
         
         #Adds the vertical scale bar
-        msp.add_line((self.locations[0]-50, rounded_bottom), (self.locations[0]-50, rounded_top), dxfattribs={'layer':'Scale_Bar'})
+        msp.add_line((self.locations[0]-50, rounded_bottom), (self.locations[0]-50, rounded_top), dxfattribs={'layer':'Vertical_Scale_Bar'})
         
         #Add the depth lines on the scale bar in feet
         for depth in range(rounded_bottom, rounded_top+1, 10):
             if depth % 50 == 0:
-                msp.add_line((self.locations[0]-70, depth), (self.locations[0]-50, depth), dxfattribs={'layer':'Scale_Bar'})
-                msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-90, depth), 'layer':'Scale_Bar'})
+                msp.add_line((self.locations[0]-70, depth), (self.locations[0]-50, depth), dxfattribs={'layer':'Vertical_Scale_Bar'})
+                msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-90, depth), 'layer':'Vertical_Scale_Bar_Text'})
             else:
-                msp.add_line((self.locations[0]-60, depth), (self.locations[0]-50, depth), dxfattribs={'layer':'Scale_Bar'})
+                msp.add_line((self.locations[0]-60, depth), (self.locations[0]-50, depth), dxfattribs={'layer':'Vertical_Scale_Bar'})
         
         #Adds the depth lines on the scale bar in meters
         for depth in range(meters_top):
             if depth % 20 == 0:
-                msp.add_line((self.locations[0]-30, depth*3.281), (self.locations[0]-50, depth*3.281), dxfattribs={'layer':'Scale_Bar'})
-                msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-20, depth*3.281), 'layer':'Scale_Bar'})
+                msp.add_line((self.locations[0]-30, depth*3.281), (self.locations[0]-50, depth*3.281), dxfattribs={'layer':'Vertical_Scale_Bar'})
+                msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-20, depth*3.281), 'layer':'Vertical_Scale_Bar_Text'})
                 
         for depth in range(meters_bottom, 0):
             if depth % 20 == 0:
-                msp.add_line((self.locations[0]-30, depth*3.281), (self.locations[0]-50, depth*3.281), dxfattribs={'layer':'Scale_Bar'})
-                msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-20, depth*3.281), 'layer':'Scale_Bar'})
+                msp.add_line((self.locations[0]-30, depth*3.281), (self.locations[0]-50, depth*3.281), dxfattribs={'layer':'Vertical_Scale_Bar'})
+                msp.add_text(str(depth), dxfattribs={'insert':(self.locations[0]-20, depth*3.281), 'layer':'Vertical_Scale_Bar_Text'})
         
         #Adds horizontal scale bar
         shortened_mile = 5280 / self.vertical_exaggeration_inputted
-        msp.add_line((0, self.deepest_borehole - 110), (shortened_mile, self.deepest_borehole-110), dxfattribs={'layer': 'Scale_Bar'})
+        msp.add_line((0, self.deepest_borehole - 110), (shortened_mile, self.deepest_borehole-110), dxfattribs={'layer': 'Horizontal_Scale_Bar'})
 
         mile_markers = [0, 1320, 2640, 3960, 5280]
 
         for marker in mile_markers:
-            msp.add_line((marker/self.vertical_exaggeration_inputted, self.deepest_borehole-120), (marker/self.vertical_exaggeration_inputted, self.deepest_borehole-110), dxfattribs={'layer': "Scale_Bar"})
-            msp.add_text(str(marker), dxfattribs={"insert":(marker/self.vertical_exaggeration_inputted, self.deepest_borehole-100)})
-        
+            msp.add_line((marker/self.vertical_exaggeration_inputted, self.deepest_borehole-120), (marker/self.vertical_exaggeration_inputted, self.deepest_borehole-110), dxfattribs={'layer': "Horizontal_Scale_Bar"})
+            msp.add_text(str(marker), dxfattribs={"insert":(marker/self.vertical_exaggeration_inputted, self.deepest_borehole-100), 'layer':'Horizontal_Scale_Bar_Text'})
+
+        #Somewhere somehow the formations list is being added to. It will contain Distance as the final value by the time it gets here
+        for form in self.formations_list[:-2]:
+            doc.layers.add(name=str(form))
+            msp.add_text(str(form), dxfattribs={'insert':(0,0), 'layer':str(form)})
         
         doc.saveas(save_path)
     
