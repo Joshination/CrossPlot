@@ -1,3 +1,4 @@
+
 """
 Created on Tue Nov 19 11:51 2024
 Updated on Mon Feb 17 12:43 2025
@@ -2868,7 +2869,7 @@ class Ui_MainWindow(object):
                         
                         if row != self.style_array.shape[0]-2:
                             connection_top_index = np.where(self.formation_polygons[row+1][-1] == self.locations[connection])[0]
-                            connection_top = self.formation_polygons[row+1][1, connection_top_index]
+                            connection_top = self.formation_polygons[row+1][0, connection_top_index]
                         
                         
                             if np.isin(self.locations[connection], total_stack[-1]):
@@ -2983,7 +2984,94 @@ class Ui_MainWindow(object):
             if row != len(self.initial_polygon_list):
                 self.formation_polygons[row] = total_stack
             
-            
+
+
+    def create_formation_outlines(self):
+        """
+        Creates a polygon outline for each formation. This is done by splitting formations into chunks if needed and finding the bottom of the formation by looking at
+        the top of formations below
+        This is primarily to be used in the export for autocad
+        """
+        self.formation_outline_dict = {}
+        for form in self.formations_list[:-2]:
+            self.formation_outline_dict[form] = []
+        
+        for row, formation in enumerate(self.formation_polygons):
+            if np.any(self.style_array[row] == 'f') or np.any(self.style_array[row] == 'p'):
+                #Then we create a process that breaks the formation  in to chunks
+                if np.any(self.style_array[row+1] == 'f') or np.any(self.style_array[row+1] == 'p'):
+                    pass
+
+            else:
+                #Can just check the formation below for the same style conditions. If it contains styles we need to search for the bottom continuously until it is solid
+                if np.any(self.style_array[row+1] == 'f') or np.any(self.style_array[row+1] == 'p'):
+                    #Create the top half of the formation outline
+                    complete_formation_outline = []
+                    for top_col in range(formation.shape[1]):
+                        complete_formation_outline.append((formation[-1, top_col]/self.vertical_exaggeration_inputted, formation[0, top_col]))
+                    #Create a process to search for the bottom of the formation
+                    for style_column in reversed(range(self.style_array.shape[1])):
+                        runs = 1
+                        while self.style_array[row+runs, style_column] == 'n':
+                            runs += 1
+                            print(row+runs)
+
+                        if row+runs == self.style_array.shape[0]-1:
+                            current_borehole_location = self.locations[style_column]
+                            mask = self.formation_polygons[-1][-1] == current_borehole_location
+                            formation_chunk = self.formation_polygons[-1][:, mask]
+                            complete_formation_outline.append((formation_chunk[-1, 0]/self.vertical_exaggeration_inputted, self.current_TD[style_column]))
+                            #The use of current_TD with style_column is a bit of a hack, but it works for now
+
+                        elif self.style_array[row+runs, style_column] == 'f' or self.style_array[row+runs, style_column] == 'p':
+                            #Create a process to find the bottom of the formation
+                            direction = check_left_right(self.style_array[row+runs], style_column)
+                            if direction == 'left':
+                                #Create a process to find the bottom of the formation
+                                current_borehole_location = self.locations[style_column]
+                                left_borehole_location = self.locations[style_column-1]
+                                
+                                mask = (self.formation_polygons[row+runs][-1] <= current_borehole_location) & (self.formation_polygons[row+runs][-1] > left_borehole_location)
+                                formation_chunk = self.formation_polygons[row+runs][:, mask]
+                                for bottom_col in reversed(range(formation_chunk.shape[1])):
+                                    complete_formation_outline.append((formation_chunk[-1, bottom_col]/self.vertical_exaggeration_inputted, formation_chunk[0, bottom_col]))
+
+                            elif direction == 'right':
+                                #Create a process to find the bottom of the formation
+                                current_borehole_location = self.locations[style_column]
+                                right_borehole_location = self.locations[style_column+1]
+
+                                mask = (self.formation_polygons[row+runs][-1] >= current_borehole_location) & (self.formation_polygons[row+runs][-1] < right_borehole_location)
+                                formation_chunk = self.formation_polygons[row+runs][:, mask]
+                                for bottom_col in reversed(range(formation_chunk.shape[1])):
+                                    complete_formation_outline.append((formation_chunk[-1, bottom_col]/self.vertical_exaggeration_inputted, formation_chunk[0, bottom_col]))
+
+                            elif direction == 'both':
+                                #Create a process to find the bottom of the formation
+                                left_borehole_location = self.locations[style_column-1]
+                                right_borehole_location = self.locations[style_column+1]
+
+                                mask = (self.formation_polygons[row+runs][-1] > left_borehole_location) & (self.formation_polygons[row+runs][-1] < right_borehole_location)
+                                formation_chunk = self.formation_polygons[row+runs][:, mask]
+                                for bottom_col in reversed(range(formation_chunk.shape[1])):
+                                    complete_formation_outline.append((formation_chunk[-1, bottom_col]/self.vertical_exaggeration_inputted, formation_chunk[0, bottom_col]))
+
+                        elif self.style_array[row+runs, style_column] == 'x' or self.style_array[row+runs, style_column] == 'c':
+                            current_borehole_location = self.locations[style_column]
+                            mask = self.formation_polygons[row+1][-1] == current_borehole_location
+                            formation_chunk = self.formation_polygons[row+1][:, mask]
+                            complete_formation_outline.append((formation_chunk[-1, 0]/self.vertical_exaggeration_inputted, formation_chunk[0, 0]))
+                            
+                    self.formation_outline_dict[self.formations_list[row]].append(complete_formation_outline)
+
+                else:
+                    #Create a full clean polygon with no breaks
+                    complete_formation_outline = []
+                    for top_col in range(formation.shape[1]):
+                        complete_formation_outline.append((formation[-1, top_col]/self.vertical_exaggeration_inputted, formation[0, top_col]))
+                    for bottom_col in reversed(range(formation.shape[1])):
+                        complete_formation_outline.append((formation[-1, bottom_col]/self.vertical_exaggeration_inputted, formation[1, bottom_col]))
+                    self.formation_outline_dict[self.formations_list[row]].append(complete_formation_outline)
             
 ######################################################################################################################################################################
 
@@ -3260,112 +3348,8 @@ class Ui_MainWindow(object):
     def save_autocad_dxf(self):
         save_path, _ = QtWidgets.QFileDialog.getSaveFileName(None, 'Save File', '')
         save_path += '.dxf'
-        
-        """
-        formation_chunk_dict = {}
-        
-        for row, style in enumerate(self.style_array[:-1]):
-            null_indices = np.where(style == 'n')[0]
-            formation_chunk_dict[row] = []
-            
-            if null_indices.shape[0] == 0:
-                formation_polygon_chunk = self.formation_polygons[row].copy()
-                formation_chunk_dict[row].append(formation_polygon_chunk)
-                
-            else:
-                for null_index ,null in enumerate(null_indices):
-                    
-                    #Check if it is the last null
-                    if null_index == len(null_indices)-1:
-                        
-                        if null == self.style_array.shape[1]-1:
-                            
-                            if len(null_indices) == 1:
-                                formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                                formation_polygon_chunk = self.formation_polygons[row][:, :formation_null_index].copy()
-                                
-                                #Handles interlocking fades at the end of formations, weird edge case that could show up
-                                if self.style_array[row, null-1] == 'f' and self.style_array[row+1, null] == 'f':
-                                    formation_polygon_chunk = self.formation_polygons[row].copy()
-                                    no_nulls_columns = ~np.any(np.isnan(formation_polygon_chunk), axis=0)
-                                    formation_polygon_chunk = formation_polygon_chunk[:, no_nulls_columns]
-                                    
-                                    formation_chunk_dict[row].append(formation_polygon_chunk)
-                            else:
-                                continue
-                        
-                        elif len(null_indices) == 1:
-                            #The formation chunk starts at the beginning of the array and ends at this null
-                            formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                            formation_polygon_chunk = self.formation_polygons[row][:, :formation_null_index].copy()
-                            formation_chunk_dict[row].append(formation_polygon_chunk)
-                            
-                            formation_polygon_chunk = self.formation_polygons[row][:, formation_null_index+1:].copy()
-                            
-                        else:
-                            # The formation polygon chunk is the entire thing after this null
-                            formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                            formation_polygon_chunk = self.formation_polygons[row][:, formation_null_index+1:].copy()
 
-                    #Check if it is the first null
-                    elif null_index == 0:
-                        #Check if there are any other nulls
-                        if len(null_indices) == 1:
-                            
-                            if null == 0:
-                                #The formation polygon chunk is the entire thing minus the first point
-                                formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                                formation_polygon_chunk = self.formation_polygons[row][:, formation_null_index+1:].copy()
-                                
-                                
-                            else: #The formation chunk starts at the beginning of the array and ends at this null
-                                formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                                formation_polygon_chunk = self.formation_polygons[row][:, :formation_null_index].copy()
-                                
-                                formation_chunk_dict[row].append(formation_polygon_chunk)
-                                
-                                formation_polygon_chunk = self.formation_polygons[row][:, formation_null_index+1:].copy()
-                                
-                                
-                        #Check if it has a null immediately after it
-                        elif null == null_indices[null_index+1]-1:
-                            formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                            formation_polygon_chunk = self.formation_polygons[row][:, :formation_null_index].copy()
-                            
-                            
-                        elif null == 0: #The formation polygon chunk starts after this null and ends at the next null
-                            formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                            next_formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null_indices[null_index+1]])[0][0]
-                            formation_polygon_chunk = self.formation_polygons[row][:, formation_null_index+1:next_formation_null_index].copy()
-                            
-                            
-                            
-                        else: #The formation chunk starts at the beginning of the array and ends at this null
-                            formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                            formation_polygon_chunk = self.formation_polygons[row][:, :formation_null_index].copy()
-                            
-                        
-                    #Check if the null is just a normal null in the middle
-                    else:
-                        #Check if it has a null immediately after it
-                        if null == null_indices[null_index+1]-1:
-                            continue #Skip to the next null
-                            
-                        else:#The formation polygon chunk starts after this null and ends at the next null
-                            formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null])[0][0]
-                            next_formation_null_index = np.where(self.formation_polygons[row][-1] == self.locations[null_indices[null_index+1]])[0][0]
-                            formation_polygon_chunk = self.formation_polygons[row][:, formation_null_index+1:next_formation_null_index].copy()
-                        
-                        
-                    if formation_polygon_chunk.shape[1] != 0:
-                        formation_chunk_dict[row].append(formation_polygon_chunk)
-                        
-          """
-        
-
-
-
-
+        self.create_formation_outlines()
 
         shortened_locations = np.array(self.locations) / self.vertical_exaggeration_inputted
         shortened_distance  = np.array(self.distance) / self.vertical_exaggeration_inputted
@@ -3400,14 +3384,14 @@ class Ui_MainWindow(object):
         #Creates a rounded top and bottom for the scale bar
         rounded_top = round(self.tallest_borehole/50) * 50
         rounded_bottom = round(self.deepest_borehole/50) * 50
-        
-        meters_top = int(rounded_top / 3.281)
-        meters_bottom = int(rounded_bottom / 3.281)
-        
+
         if rounded_top < self.tallest_borehole:
             rounded_top += 50 
         if rounded_bottom > self.deepest_borehole:
             rounded_bottom -= 50
+        
+        meters_top = int(rounded_top / 3.281)
+        meters_bottom = int(rounded_bottom / 3.281)
         
         #Adds the vertical scale bar
         msp.add_line((self.locations[0]-50, rounded_bottom), (self.locations[0]-50, rounded_top), dxfattribs={'layer':'Vertical_Scale_Bar'})
@@ -3442,9 +3426,16 @@ class Ui_MainWindow(object):
             msp.add_text(str(marker), dxfattribs={"insert":(marker/self.vertical_exaggeration_inputted, self.deepest_borehole-100), 'layer':'Horizontal_Scale_Bar_Text'})
 
         #Somewhere somehow the formations list is being added to. It will contain Distance as the final value by the time it gets here
-        for form in self.formations_list[:-2]:
-            doc.layers.add(name=str(form))
-            msp.add_text(str(form), dxfattribs={'insert':(0,0), 'layer':str(form)})
+        for formation_name, outline_list in self.formation_outline_dict.items():
+            if len(outline_list) == 0:
+                continue
+            else:
+                print(formation_name)
+                print(outline_list)
+                doc.layers.add(name=str(formation_name))
+                for outline in outline_list:
+                    msp.add_lwpolyline(outline, close=True, dxfattribs={'layer':str(formation_name)})
+            
         
         doc.saveas(save_path)
     
