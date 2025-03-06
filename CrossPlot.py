@@ -3245,8 +3245,7 @@ class Ui_MainWindow(object):
                         complete_formation_outline.append((formation[-1, bottom_col]/self.vertical_exaggeration_inputted, formation[1, bottom_col]))
                     self.formation_outline_dict[self.formations_list[row]].append(complete_formation_outline)
 
-            print(self.formations_list[row])
-            print(self.formation_outline_dict['Tap'])
+            
             
 ######################################################################################################################################################################
 
