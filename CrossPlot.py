@@ -932,7 +932,7 @@ class Ui_MainWindow(object):
         self.actionSave_as_JPEG.setText(_translate("MainWindow", "Save as JPEG"))
         self.actionSave_as_TIFF.setText(_translate("MainWindow", "Save as TIFF"))
         self.actionSave_as_EPS.setText(_translate("MainWindow", "Save as EPS"))
-        self.actionSave_as_DXF.setText(_translate('MainWindow', 'Save as DXF'))
+        self.actionSave_as_DXF.setText(_translate('MainWindow', 'Save as Illustrator DXF'))
         self.actionSave_as_AutoCadDXF.setText(_translate('MainWindow', 'Save as AutoCad DXF'))
         self.actionExport_as_Excel.setText(_translate("MainWindow", "Export as Excel"))
         self.actionExport_as_CSV.setText(_translate("MainWindow", "Export as CSV"))
@@ -948,13 +948,72 @@ class Ui_MainWindow(object):
 #region Main Page Widgets
 # =============================================================================
    
-    def update_current_TD(self):
+    def create_formations_TD(self):
+        """
+        Creates an array containing the total depth along the bottom of the cross section
+        The first row is the depth
+        Second row is the location
+        Third row is the formation
+        """
+
+        total_depths = []
+        TD_locations = []
+        TD_formations = []
+        for style_column in range(self.style_array.shape[1]):
+            runs = self.style_array.shape[0]-2
+            while self.style_array[runs, style_column] == 'n':
+                runs -= 1
+            
+
+            if self.style_array[runs, style_column] == 'f' or self.style_array[runs, style_column] == 'p':
+                
+                direction = check_left_right(self.style_array[runs], style_column)
+                if direction == 'left':
+                    left_borehole_location = self.locations[style_column-1]
+                    right_borehole_location = self.locations[style_column]
+                    mask = (self.formation_polygons[runs][-1] > left_borehole_location) & (self.formation_polygons[runs][-1] <= right_borehole_location)
+                    TD_chunk = self.formation_polygons[runs][1, mask]
+                    locations_chunk = self.formation_polygons[runs][-1, mask]
+                    for point in range(TD_chunk.shape[0]):
+                        TD_formations.append(runs)
+                        total_depths.append(TD_chunk[point])
+                        TD_locations.append(locations_chunk[point])
+                    
+                elif direction == 'right':
+                    left_borehole_location = self.locations[style_column]
+                    right_borehole_location = self.locations[style_column+1]
+                    mask = (self.formation_polygons[runs][-1] >= left_borehole_location) & (self.formation_polygons[runs][-1] < right_borehole_location)
+                    TD_chunk = self.formation_polygons[runs][1, mask]
+                    locations_chunk = self.formation_polygons[runs][-1, mask]
+                    for point in range(TD_chunk.shape[0]):
+                        TD_formations.append(runs)
+                        total_depths.append(TD_chunk[point])
+                        TD_locations.append(locations_chunk[point])
+                    
+                elif direction == "both":
+                    left_borehole_location = self.locations[style_column-1]
+                    right_borehole_location = self.locations[style_column+1]
+                    mask = (self.formation_polygons[runs][-1] > left_borehole_location) & (self.formation_polygons[runs][-1] < right_borehole_location)
+                    TD_chunk = self.formation_polygons[runs][1, mask]
+                    locations_chunk = self.formation_polygons[runs][-1, mask]
+                    for point in range(TD_chunk.shape[0]):
+                        TD_formations.append(runs)
+                        total_depths.append(TD_chunk[point])
+                        TD_locations.append(locations_chunk[point])
+                    
+            else:
+                
+                mask = self.formation_polygons[runs][-1] == self.locations[style_column]
+                TD_chunk = self.formation_polygons[runs][1, mask]
+                locations_chunk = self.formation_polygons[runs][-1, mask]
+                total_depths.append(TD_chunk[0])
+                TD_locations.append(locations_chunk[0])
+                for point in TD_chunk:
+                    TD_formations.append(runs)
+
+        self.formations_TD = np.array([total_depths, TD_locations, TD_formations])
+        self.original_formations_TD = np.array([total_depths, TD_locations, TD_formations])
         
-        if np.any(self.style_array[-1] == 'c'):
-            connection_TD_indices = np.where(self.style_array[-1] == 'c')[0]
-            for connection_TD_index in connection_TD_indices:
-                formation_polygon_connection_index = np.where(self.formation_polygons[-1][-1] == self.locations[connection_TD_index])[0][0]
-                self.current_TD[connection_TD_index] = self.formation_polygons[-1][1, formation_polygon_connection_index]
 
     def limit_TD(self):
         """
@@ -966,24 +1025,16 @@ class Ui_MainWindow(object):
             self.max_TD = -1000000000000
         
         
-        deeper_than_forced_TD = self.original_TD < self.max_TD
-        
-        for borehole_index in range(self.original_TD.shape[0]):
-            TD = np.nan
-            formation = 0
-            while np.isnan(TD):
-                formation -= 1
-                TD_index = np.where(self.formation_polygons[formation][-1] == self.locations[borehole_index])[0][0]
-                TD = self.formation_polygons[formation][1, TD_index]
-                
-            if TD < self.max_TD:
-                #Set to the max_TD
-                self.formation_polygons[formation][1, TD_index] = self.max_TD
-                
+        for TD_index in range(self.formations_TD.shape[1]):
+            row = int(self.formations_TD[-1, TD_index])
+
+            if self.formations_TD[0, TD_index] < self.max_TD:
+                change_index = np.where(self.formation_polygons[row][-1] == self.formations_TD[1, TD_index])[0]
+                self.formation_polygons[row][1, change_index] = self.max_TD
+                self.formations_TD[0, TD_index] = self.max_TD
             else:
-                #Set to the original_TD
-                self.formation_polygons[formation][1, TD_index] = self.current_TD[borehole_index].copy()
-                
+                change_index = np.where(self.formation_polygons[row][-1] == self.formations_TD[1, TD_index])[0]
+                self.formation_polygons[row][1, change_index] = self.original_formations_TD[0, TD_index]
             
 
     def hide_formation_labels(self):
@@ -1416,8 +1467,8 @@ class Ui_MainWindow(object):
             for col in range(self.formations_array.shape[1]):
                 item = self.formations_table.item(row, col) #Pulls the item in the formation table
                 self.formations_array[row, col] = float(item.text()) #Converts it to a usable value and assigns it to the correct location
-        self.original_TD = self.formations_array[-1].copy()
-        self.current_TD = self.formations_array[-1].copy()
+        self.borehole_TD = self.formations_array[-1].copy()
+        
             
                 
     def create_style_table(self):
@@ -2093,7 +2144,6 @@ class Ui_MainWindow(object):
         self.create_pinch_fade_correction_dict()
         self.formation_polygons_combo_box()
         self.calculate_polygons()
-        self.update_current_TD()
         self.style_updated = False
 
     def handle_polygon_update(self):
@@ -2127,7 +2177,6 @@ class Ui_MainWindow(object):
         self.plotting_colors = []
         
         self.create_initial_info()
-        self.current_TD = self.formations_array[-1].copy()
         self.create_pinch_fade_correction_dict()
         self.formation_polygons_combo_box()
         self.create_initial_polygon_list()
@@ -2201,8 +2250,8 @@ class Ui_MainWindow(object):
         #Plots the borehole lines to indicate location and depth, also adds W-#
         for n in range(len(self.w_num)):
 
-            if self.original_TD[n] > self.max_TD:
-                ax.vlines(self.locations[n], color='k', ymin=self.original_TD[n], ymax=self.well_elev[n])
+            if self.borehole_TD[n] > self.max_TD:
+                ax.vlines(self.locations[n], color='k', ymin=self.borehole_TD[n], ymax=self.well_elev[n])
             else:
                 ax.vlines(self.locations[n], color='k', ymin=self.max_TD, ymax=self.well_elev[n])
             ax.annotate("W-" + str(self.w_num[n]), (self.locations[n] - self.locations[-1]*0.01 , self.tallest_borehole + 80)) #Note that this uses 1% of the total length to offset labels over well lines
@@ -2301,8 +2350,8 @@ class Ui_MainWindow(object):
                 self.plotting_colors.append(self.colors_list[runs])
                 runs += 1
 
-        self.original_TD = self.formations_array[-1].copy()
-        self.current_TD = self.formations_array[-1].copy()
+        self.borehole_TD = self.formations_array[-1].copy()
+        
         
             
     def create_initial_polygon_list(self):
@@ -2983,9 +3032,13 @@ class Ui_MainWindow(object):
             
             if row != len(self.initial_polygon_list):
                 self.formation_polygons[row] = total_stack
-            
+
+        self.create_formations_TD()   
 
 
+# =============================================================================
+#region Formation Outline
+# =============================================================================            
     def create_formation_outlines(self):
         """
         Creates a polygon outline for each formation. This is done by splitting formations into chunks if needed and finding the bottom of the formation by looking at
@@ -2998,12 +3051,133 @@ class Ui_MainWindow(object):
         
         for row, formation in enumerate(self.formation_polygons):
             if np.any(self.style_array[row] == 'f') or np.any(self.style_array[row] == 'p'):
-                #Then we create a process that breaks the formation  in to chunks
-                if np.any(self.style_array[row+1] == 'f') or np.any(self.style_array[row+1] == 'p'):
-                    pass
+                #Then we create a process that breaks the formation in to chunks
+                chunk_list = []
+                chunk = []
+                for style_column, style_letter in enumerate(self.style_array[row]):
+                    if style_letter != 'n':
+                        chunk.append(style_column)
+                    else:
+                        if len(chunk) > 0:
+                            chunk_list.append(chunk)
+                            chunk = []
+                if len(chunk) > 0:
+                    chunk_list.append(chunk)
 
+                #Gather the top of formation outline
+                for chunk in chunk_list:
+                    formation_chunk_outline = []
+                    #Check if there is only one borehole in the chunk
+                    if len(chunk) == 1:
+                        direction = check_left_right(self.style_array[row], chunk[0])
+                        if direction == 'left':
+                            left_borehole_location = self.locations[chunk[0]-1]
+                            current_borehole_location = self.locations[chunk[0]]
+                            mask = (self.formation_polygons[row][-1] > left_borehole_location) & (self.formation_polygons[row][-1] <= current_borehole_location)
+                            top_formation_chunk = self.formation_polygons[row][:, mask]
+                            for top_col in range(top_formation_chunk.shape[1]):
+                                formation_chunk_outline.append((top_formation_chunk[-1, top_col]/self.vertical_exaggeration_inputted, top_formation_chunk[0, top_col]))
+                        elif direction == 'right':
+                            right_borehole_location = self.locations[chunk[0]+1]
+                            current_borehole_location = self.locations[chunk[0]]
+                            mask = (self.formation_polygons[row][-1] >= current_borehole_location) & (self.formation_polygons[row][-1] < right_borehole_location)
+                            top_formation_chunk = self.formation_polygons[row][:, mask]
+                            for top_col in range(top_formation_chunk.shape[1]):
+                                formation_chunk_outline.append((top_formation_chunk[-1, top_col]/self.vertical_exaggeration_inputted, top_formation_chunk[0, top_col]))
+                        elif direction == 'both':
+                            left_borehole_location = self.locations[chunk[0]-1]
+                            right_borehole_location = self.locations[chunk[0]+1]
+                            mask = (self.formation_polygons[row][-1] > left_borehole_location) & (self.formation_polygons[row][-1] < right_borehole_location)
+                            top_formation_chunk = self.formation_polygons[row][:, mask]
+                            for top_col in range(top_formation_chunk.shape[1]):
+                                formation_chunk_outline.append((top_formation_chunk[-1, top_col]/self.vertical_exaggeration_inputted, top_formation_chunk[0, top_col]))
+
+                    #Check if the start of the chunk is a pinch or fade
+                    elif self.style_array[row, chunk[0]] == "p" or self.style_array[row, chunk[0]] == "f":
+                        left_borehole_location = self.locations[chunk[0]-1]
+                        if self.style_array[row, chunk[-1]] == "p" or self.style_array[row, chunk[-1]] == "f":
+                            right_borehole_location = self.locations[chunk[-1]+1]
+                            mask = (self.formation_polygons[row][-1] > left_borehole_location) & (self.formation_polygons[row][-1] < right_borehole_location)
+                        else:
+                            right_borehole_location = self.locations[chunk[-1]]
+                            mask = (self.formation_polygons[row][-1] > left_borehole_location) & (self.formation_polygons[row][-1] <= right_borehole_location)
+
+                        top_formation_chunk = self.formation_polygons[row][:, mask]
+                        for top_col in range(top_formation_chunk.shape[1]):
+                            formation_chunk_outline.append((top_formation_chunk[-1, top_col]/self.vertical_exaggeration_inputted, top_formation_chunk[0, top_col]))
+                    
+                    else:
+                        left_borehole_location = self.locations[chunk[0]]
+                        if self.style_array[row, chunk[-1]] == "p" or self.style_array[row, chunk[-1]] == "f":
+                            right_borehole_location = self.locations[chunk[-1]+1]
+                            mask = (self.formation_polygons[row][-1] >= left_borehole_location) & (self.formation_polygons[row][-1] < right_borehole_location)
+                        else:
+                            right_borehole_location = self.locations[chunk[-1]]
+                            mask = (self.formation_polygons[row][-1] >= left_borehole_location) & (self.formation_polygons[row][-1] <= right_borehole_location)
+
+                        top_formation_chunk = self.formation_polygons[row][:, mask]
+                        for top_col in range(top_formation_chunk.shape[1]):
+                            formation_chunk_outline.append((top_formation_chunk[-1, top_col]/self.vertical_exaggeration_inputted, top_formation_chunk[0, top_col]))
+
+
+                    #Get the bottom of the formation outline
+                    for style_column in reversed(chunk):
+                        runs = 1
+                        while self.style_array[row+runs, style_column] == 'n':
+                            runs += 1
+
+                        if row+runs == self.style_array.shape[0]-1:
+                            current_borehole_location = self.locations[style_column]
+                            mask = self.formations_TD[1] == current_borehole_location
+                            TD_chunk = self.formations_TD[:, mask]
+                            formation_chunk_outline.append((TD_chunk[1,0]/self.vertical_exaggeration_inputted, TD_chunk[0,0]))
+                            
+
+                        elif self.style_array[row+runs, style_column] == 'f' or self.style_array[row+runs, style_column] == 'p':
+                            #Create a process to find the bottom of the formation
+                            direction = check_left_right(self.style_array[row+runs], style_column)
+                            if direction == 'left':
+                                #Create a process to find the bottom of the formation
+                                current_borehole_location = self.locations[style_column]
+                                left_borehole_location = self.locations[style_column-1]
+                                
+                                mask = (self.formation_polygons[row+runs][-1] <= current_borehole_location) & (self.formation_polygons[row+runs][-1] > left_borehole_location)
+                                formation_chunk = self.formation_polygons[row+runs][:, mask]
+                                for bottom_col in reversed(range(formation_chunk.shape[1])):
+                                    formation_chunk_outline.append((formation_chunk[-1, bottom_col]/self.vertical_exaggeration_inputted, formation_chunk[0, bottom_col]))
+
+                            elif direction == 'right':
+                                #Create a process to find the bottom of the formation
+                                current_borehole_location = self.locations[style_column]
+                                right_borehole_location = self.locations[style_column+1]
+
+                                mask = (self.formation_polygons[row+runs][-1] >= current_borehole_location) & (self.formation_polygons[row+runs][-1] < right_borehole_location)
+                                formation_chunk = self.formation_polygons[row+runs][:, mask]
+                                for bottom_col in reversed(range(formation_chunk.shape[1])):
+                                    formation_chunk_outline.append((formation_chunk[-1, bottom_col]/self.vertical_exaggeration_inputted, formation_chunk[0, bottom_col]))
+
+                            elif direction == 'both':
+                                #Create a process to find the bottom of the formation
+                                left_borehole_location = self.locations[style_column-1]
+                                right_borehole_location = self.locations[style_column+1]
+
+                                mask = (self.formation_polygons[row+runs][-1] > left_borehole_location) & (self.formation_polygons[row+runs][-1] < right_borehole_location)
+                                formation_chunk = self.formation_polygons[row+runs][:, mask]
+                                for bottom_col in reversed(range(formation_chunk.shape[1])):
+                                    formation_chunk_outline.append((formation_chunk[-1, bottom_col]/self.vertical_exaggeration_inputted, formation_chunk[0, bottom_col]))
+
+                        elif self.style_array[row+runs, style_column] == 'x' or self.style_array[row+runs, style_column] == 'c':
+                            current_borehole_location = self.locations[style_column]
+                            mask = self.formation_polygons[row+1][-1] == current_borehole_location
+                            formation_chunk = self.formation_polygons[row+1][:, mask]
+                            formation_chunk_outline.append((formation_chunk[-1, 0]/self.vertical_exaggeration_inputted, formation_chunk[0, 0]))
+                            
+                    self.formation_outline_dict[self.formations_list[row]].append(formation_chunk_outline)
+                        
+                        
             else:
-                #Can just check the formation below for the same style conditions. If it contains styles we need to search for the bottom continuously until it is solid
+                #Can just check the formation below for the same style conditions. If it contains styles, then we need to search for the bottom continuously until it is
+                #a usable value
                 if np.any(self.style_array[row+1] == 'f') or np.any(self.style_array[row+1] == 'p'):
                     #Create the top half of the formation outline
                     complete_formation_outline = []
@@ -3014,14 +3188,12 @@ class Ui_MainWindow(object):
                         runs = 1
                         while self.style_array[row+runs, style_column] == 'n':
                             runs += 1
-                            print(row+runs)
 
                         if row+runs == self.style_array.shape[0]-1:
                             current_borehole_location = self.locations[style_column]
-                            mask = self.formation_polygons[-1][-1] == current_borehole_location
-                            formation_chunk = self.formation_polygons[-1][:, mask]
-                            complete_formation_outline.append((formation_chunk[-1, 0]/self.vertical_exaggeration_inputted, self.current_TD[style_column]))
-                            #The use of current_TD with style_column is a bit of a hack, but it works for now
+                            mask = self.formations_TD[1] == current_borehole_location
+                            TD_chunk = self.formations_TD[:, mask]
+                            complete_formation_outline.append((TD_chunk[1, 0]/self.vertical_exaggeration_inputted, TD_chunk[0,0]))
 
                         elif self.style_array[row+runs, style_column] == 'f' or self.style_array[row+runs, style_column] == 'p':
                             #Create a process to find the bottom of the formation
@@ -3072,6 +3244,9 @@ class Ui_MainWindow(object):
                     for bottom_col in reversed(range(formation.shape[1])):
                         complete_formation_outline.append((formation[-1, bottom_col]/self.vertical_exaggeration_inputted, formation[1, bottom_col]))
                     self.formation_outline_dict[self.formations_list[row]].append(complete_formation_outline)
+
+            print(self.formations_list[row])
+            print(self.formation_outline_dict['Tap'])
             
 ######################################################################################################################################################################
 
@@ -3430,8 +3605,7 @@ class Ui_MainWindow(object):
             if len(outline_list) == 0:
                 continue
             else:
-                print(formation_name)
-                print(outline_list)
+                
                 doc.layers.add(name=str(formation_name))
                 for outline in outline_list:
                     msp.add_lwpolyline(outline, close=True, dxfattribs={'layer':str(formation_name)})
